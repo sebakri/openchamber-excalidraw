@@ -1,6 +1,6 @@
 {
   "name": "openchamber-excalidraw",
-  "version": "1.2.4",
+  "version": "1.3.0",
   "description": "Draw in .excalidraw and Obsidian .excalidraw.md files right in OpenChamber's Files view",
   "private": true,
   "type": "module",
@@ -26,9 +26,6 @@
           ],
           "entry": "editor/index.html"
         }
-      ],
-      "capabilities": [
-        "files"
       ],
       "service": {
         "entry": "service/main.js",

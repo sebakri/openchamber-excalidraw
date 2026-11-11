@@ -90,9 +90,6 @@ const setSession = (next: CanvasSession | null): void => { session = next; };
 const reportChange = (change: FileEditorChange): void => host.reportFileChange(change);
 const reportUnsupported = (): void => host.reportFileUnsupported();
 
-// Path of the SVG written next to the drawing: `a/b.excalidraw` -> `a/b.svg`.
-const svgPathFor = (path: string): string => path.replace(/\.excalidraw(\.md)?$/, '') + '.svg';
-
 type State = { context: HostReadyContext | null; file: FileEditorDocument | null; opened: number };
 
 const App: React.FC = () => {
@@ -122,15 +119,6 @@ const App: React.FC = () => {
       onSession={setSession}
       onChange={reportChange}
       onUnsupported={reportUnsupported}
-      onSaveSvg={async (svg) => {
-        const path = svgPathFor(state.file!.path);
-        try {
-          await host.writeFile(path, svg);
-          await host.toast({ kind: 'success', message: `Saved ${path}` });
-        } catch (error) {
-          await host.toast({ kind: 'error', message: `Could not save ${path}: ${error instanceof Error ? error.message : String(error)}`, copy: true });
-        }
-      }}
     />
   );
 };
