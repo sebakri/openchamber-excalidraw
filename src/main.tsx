@@ -25,6 +25,22 @@ const blobToBase64 = (blob: Blob): Promise<string> =>
     reader.onerror = () => reject(reader.error);
     reader.readAsDataURL(blob);
   });
+// The host spawns the service on the first request, which can outlast its reply
+// window. Wake it when the editor opens and retry requests that time out.
+type ServiceCall = Parameters<typeof host.serviceRequest>[0];
+const callService = async (request: ServiceCall) => {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    try {
+      return await host.serviceRequest(request);
+    } catch (error) {
+      lastError = error;
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+    }
+  }
+  throw lastError;
+};
+void callService({ method: 'GET', path: '/health' }).catch(() => undefined);
 const originalWrite = navigator.clipboard?.write?.bind(navigator.clipboard);
 const patchedWrite = async (items: ClipboardItem[]): Promise<void> => {
   for (const item of items) {
@@ -37,7 +53,7 @@ const patchedWrite = async (items: ClipboardItem[]): Promise<void> => {
       const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
       for (let index = 0; index < total; index += 1) {
         try {
-          const result = await host.serviceRequest({ method: 'POST', path: '/copy-png', body: JSON.stringify({ id, index, total, data: data.slice(index * CHUNK, (index + 1) * CHUNK) }) });
+          const result = await callService({ method: 'POST', path: '/copy-png', body: JSON.stringify({ id, index, total, data: data.slice(index * CHUNK, (index + 1) * CHUNK) }) });
           if (result.status >= 400) throw new Error(`status ${result.status}: ${result.body}`);
         } catch (chunkError) {
           throw new Error(`chunk ${index + 1}/${total} of ${Math.round(data.length / 1024)} KB: ${chunkError instanceof Error ? chunkError.message : String(chunkError)}`);
