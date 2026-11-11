@@ -7,6 +7,7 @@
 //    menu entries that would open it.
 //  - Excalidraw locales OpenChamber has no language for.
 import { rm } from 'node:fs/promises';
+import { $ } from 'bun';
 
 import { SHIPPED_LANG_CODES } from '../src/scene.ts';
 
@@ -58,3 +59,6 @@ for (const output of result.outputs) {
   if (name !== 'main.js' && name !== 'main.css') await rm(output.path, { force: true });
   else console.log(`${name}: ${(output.size / 1024 / 1024).toFixed(2)} MB`);
 }
+
+// Inline the Latin fonts so drawings render without reaching the CDN.
+await $`node scripts/inline-fonts.mjs`;
