@@ -15,6 +15,38 @@ import { CanvasEditor, type CanvasSession } from './CanvasEditor';
 // Saving, autosave, Cmd/Ctrl+S, and external changes are the host's.
 
 const host = connectHost();
+
+// The frame has no image clipboard. Excalidraw's "Copy as PNG" calls
+// navigator.clipboard.write, so hand image/png blobs to the local service.
+const blobToBase64 = (blob: Blob): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result).split(',')[1] ?? '');
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+const originalWrite = navigator.clipboard?.write?.bind(navigator.clipboard);
+const patchedWrite = async (items: ClipboardItem[]): Promise<void> => {
+  for (const item of items) {
+    if (!item.types.includes('image/png')) continue;
+    try {
+      const data = await blobToBase64(await item.getType('image/png'));
+      const result = await host.serviceRequest({ method: 'POST', path: '/copy-png', body: JSON.stringify({ data }) });
+      if (result.status >= 400) throw new Error(`status ${result.status}`);
+      await host.toast({ kind: 'success', message: 'Copied PNG to the clipboard' });
+      return;
+    } catch (error) {
+      await host.toast({ kind: 'error', message: `Could not copy PNG: ${error instanceof Error ? error.message : String(error)}`, copy: true });
+      throw error;
+    }
+  }
+  if (originalWrite) await originalWrite(items);
+};
+try {
+  Object.defineProperty(navigator.clipboard, 'write', { value: patchedWrite, configurable: true });
+} catch {
+  // read-only clipboard object: leave the default behaviour
+}
 const container = document.getElementById('root');
 if (!container) throw new Error('Missing #root');
 
