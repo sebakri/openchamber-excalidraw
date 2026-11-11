@@ -48,7 +48,7 @@ const patchedWrite = async (items: ClipboardItem[]): Promise<void> => {
     try {
       const data = await blobToBase64(await item.getType('image/png'));
       // Pieces stay small: the host's message channel times out on big bodies.
-      const CHUNK = 192 * 1024;
+      const CHUNK = 24 * 1024;
       const total = Math.ceil(data.length / CHUNK);
       const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
       for (let index = 0; index < total; index += 1) {
