@@ -82,12 +82,20 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ file, theme, locale,
     [report, tracker],
   );
 
+  const centredRef = React.useRef(false);
+
   if (!parsed) return null;
 
   return (
     <div className="oc-excalidraw">
       <Excalidraw
         initialData={parsed.scene}
+        excalidrawAPI={(api) => {
+          // Centre the drawing once, instead of opening at its stored scroll (often the top left).
+          if (!api || centredRef.current) return;
+          centredRef.current = true;
+          requestAnimationFrame(() => api.scrollToContent(undefined, { fitToViewport: true, viewportZoomFactor: 0.9, animate: false }));
+        }}
         onChange={handleChange}
         theme={theme}
         langCode={excalidrawLangCode(locale)}
