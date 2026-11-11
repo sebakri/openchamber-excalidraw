@@ -22,6 +22,7 @@ if (!Number.isInteger(port) || !token) {
   process.exit(1);
 }
 
+const pending = new Map();
 const fail = (status, message) => Object.assign(new Error(message), { status });
 const send = (response, status, body) => {
   response.writeHead(status, { 'Content-Type': 'application/json' });
@@ -67,9 +68,18 @@ const server = createServer(async (request, response) => {
   try {
     if (request.method === 'GET' && url.pathname === '/health') return send(response, 200, { ok: true });
     if (request.method === 'POST' && url.pathname === '/copy-png') {
-      const { data } = JSON.parse(await readBody(request));
-      if (typeof data !== 'string') throw fail(400, 'data must be base64 text');
-      const bytes = Buffer.from(data, 'base64');
+      // Large PNGs arrive in pieces: { id, index, total, data: <base64 piece> }.
+      const { id, index, total, data } = JSON.parse(await readBody(request));
+      if (typeof id !== 'string' || !Number.isInteger(index) || !Number.isInteger(total) || total < 1 || index < 0 || index >= total || typeof data !== 'string') {
+        throw fail(400, 'invalid chunk');
+      }
+      const entry = pending.get(id) ?? { parts: new Map(), at: Date.now() };
+      pending.set(id, entry);
+      entry.parts.set(index, data);
+      for (const [key, value] of pending) if (Date.now() - value.at > 60000) pending.delete(key);
+      if (entry.parts.size < total) return send(response, 200, { received: entry.parts.size, total });
+      pending.delete(id);
+      const bytes = Buffer.from([...Array(total).keys()].map((i) => entry.parts.get(i) ?? '').join(''), 'base64');
       if (bytes.length < PNG_MAGIC.length || !bytes.subarray(0, PNG_MAGIC.length).equals(PNG_MAGIC)) throw fail(400, 'data is not a PNG');
       const dir = await mkdtemp(join(tmpdir(), 'oc-excalidraw-'));
       try {

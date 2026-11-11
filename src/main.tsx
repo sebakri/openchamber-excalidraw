@@ -31,8 +31,14 @@ const patchedWrite = async (items: ClipboardItem[]): Promise<void> => {
     if (!item.types.includes('image/png')) continue;
     try {
       const data = await blobToBase64(await item.getType('image/png'));
-      const result = await host.serviceRequest({ method: 'POST', path: '/copy-png', body: JSON.stringify({ data }) });
-      if (result.status >= 400) throw new Error(`status ${result.status}`);
+      // Pieces stay small: the host's message channel times out on big bodies.
+      const CHUNK = 192 * 1024;
+      const total = Math.ceil(data.length / CHUNK);
+      const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      for (let index = 0; index < total; index += 1) {
+        const result = await host.serviceRequest({ method: 'POST', path: '/copy-png', body: JSON.stringify({ id, index, total, data: data.slice(index * CHUNK, (index + 1) * CHUNK) }) });
+        if (result.status >= 400) throw new Error(`status ${result.status}: ${result.body}`);
+      }
       await host.toast({ kind: 'success', message: 'Copied PNG to the clipboard' });
       return;
     } catch (error) {
