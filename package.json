@@ -1,6 +1,6 @@
 {
   "name": "openchamber-excalidraw",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "Draw in .excalidraw and Obsidian .excalidraw.md files right in OpenChamber's Files view",
   "private": true,
   "type": "module",
@@ -27,7 +27,10 @@
           "entry": "editor/index.html"
         }
       ]
-    }
+    },
+    "capabilities": [
+      "files"
+    ]
   },
   "scripts": {
     "build": "bun run scripts/build.ts",
@@ -45,7 +48,7 @@
     "@types/bun": "^1.4.2",
     "@types/react": "^19.1.10",
     "@types/react-dom": "^19.1.7",
-    "happy-dom": "^20.0.0",
-    "typescript": "^5.9.2"
+    "typescript": "^5.9.2",
+    "happy-dom": "^20.0.0"
   }
 }

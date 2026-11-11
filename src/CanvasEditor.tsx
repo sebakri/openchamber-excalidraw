@@ -1,5 +1,5 @@
 import React from 'react';
-import { Excalidraw } from '@excalidraw/excalidraw';
+import { Excalidraw, exportToSvg } from '@excalidraw/excalidraw';
 import type { AppState, BinaryFiles } from '@excalidraw/excalidraw/types';
 import type { OrderedExcalidrawElement } from '@excalidraw/excalidraw/element/types';
 import { createFileSaveTracker, type FileEditorChange, type FileEditorDocument, type FileEditorSnapshot } from '@openchamber/sdk';
@@ -26,13 +26,15 @@ type CanvasEditorProps = {
   onSession: (session: CanvasSession | null) => void;
   onChange: (change: FileEditorChange) => void;
   onUnsupported: () => void;
+  /** Writes the drawing's SVG next to the file; resolves with a message for the user. */
+  onSaveSvg: (svg: string) => Promise<void>;
 };
 
 /**
  * One document. Excalidraw reads `initialData` once, so a new document means a
  * new mount (the page keys this component by the file the host handed over).
  */
-export const CanvasEditor: React.FC<CanvasEditorProps> = ({ file, theme, locale, onSession, onChange, onUnsupported }) => {
+export const CanvasEditor: React.FC<CanvasEditorProps> = ({ file, theme, locale, onSession, onChange, onUnsupported, onSaveSvg }) => {
   const [parsed] = React.useState(() => openExcalidrawDocument(file.content, excalidrawFormatForPath(file.name)));
   const initialVersion = parsed ? excalidrawSceneSignature(parsed.scene.elements, parsed.scene.appState) : null;
   const [tracker] = React.useState(() => createFileSaveTracker(initialVersion));
@@ -82,6 +84,25 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ file, theme, locale,
     [report, tracker],
   );
 
+  const [savingSvg, setSavingSvg] = React.useState(false);
+  const saveSvg = React.useCallback(async () => {
+    const scene = liveSceneRef.current ?? (parsed ? { elements: parsed.scene.elements as readonly OrderedExcalidrawElement[], appState: parsed.scene.appState as AppState, files: (parsed.scene.files ?? {}) as BinaryFiles } : null);
+    if (!scene) return;
+    setSavingSvg(true);
+    try {
+      // The font-inlining worker is not part of this build, so the SVG names the fonts instead.
+      const svg = await exportToSvg({
+        elements: scene.elements.filter((element) => !element.isDeleted),
+        appState: { ...scene.appState, exportBackground: true, exportWithDarkMode: false },
+        files: scene.files,
+        skipInliningFonts: true,
+      });
+      await onSaveSvg(new XMLSerializer().serializeToString(svg));
+    } finally {
+      setSavingSvg(false);
+    }
+  }, [onSaveSvg, parsed]);
+
   if (!parsed) return null;
 
   return (
@@ -103,6 +124,11 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ file, theme, locale,
           },
         }}
         detectScroll={false}
+        renderTopRightUI={() => (
+          <button type="button" className="oc-save-svg" onClick={saveSvg} disabled={savingSvg} title="Save an SVG next to this file">
+            {savingSvg ? 'Saving…' : 'Save SVG'}
+          </button>
+        )}
       />
     </div>
   );
